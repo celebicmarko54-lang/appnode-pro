@@ -195,11 +195,9 @@ export function handleWebSocketMessage(
             case WebSocketMessageRequests.GET_CONVERSATION_STATE:
                 try {
                     const state = agent.getConversationState();
-                    const debugState = agent.getBehavior().getDeepDebugSessionState();
                     logger.info('Conversation state retrieved', state);
                     sendToConnection(connection, WebSocketMessageResponses.CONVERSATION_STATE, { 
                         state,
-                        deepDebugSession: debugState
                     });
                 } catch (error) {
                     logger.error('Error fetching conversation state:', error);

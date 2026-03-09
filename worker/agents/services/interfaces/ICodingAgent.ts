@@ -2,8 +2,7 @@ import { FileOutputType, FileConceptType, Blueprint } from "worker/agents/schema
 import { BaseSandboxService } from "worker/services/sandbox/BaseSandboxService";
 import { ExecuteCommandsResponse, PreviewType, StaticAnalysisResponse, RuntimeError } from "worker/services/sandbox/sandboxTypes";
 import { ProcessedImageAttachment } from "worker/types/image-attachment";
-import { BehaviorType, DeepDebugResult, DeploymentTarget, ProjectType } from "worker/agents/core/types";
-import { RenderToolCall } from "worker/agents/operations/UserConversationProcessor";
+import { BehaviorType, DeploymentTarget, ProjectType } from "worker/agents/core/types";
 import { WebSocketMessageType, WebSocketMessageData } from "worker/api/websocketTypes";
 import { GitVersionControl } from "worker/agents/git/git";
 import { OperationOptions } from "worker/agents/operations/common";
@@ -70,13 +69,6 @@ export interface ICodingAgent {
     isDeepDebugging(): boolean;
     
     waitForDeepDebug(): Promise<void>;
-    
-    executeDeepDebug(
-        issue: string,
-        toolRenderer: RenderToolCall,
-        streamCb: (chunk: string) => void,
-        focusPaths?: string[],
-    ): Promise<DeepDebugResult>;
     
     get git(): GitVersionControl;
     

@@ -1,6 +1,5 @@
-import type { PhasicBlueprint, AgenticBlueprint, PhaseConceptType ,
+import type { AgenticBlueprint,
     FileOutputType,
-    Blueprint,
 } from '../schemas';
 import type { InferenceMetadata } from '../inferutils/config.types';
 import { BehaviorType, Plan, ProjectType } from './types';
@@ -14,23 +13,8 @@ export interface FileServingToken {
     createdAt: number;
 }
 
-export interface PhaseState extends PhaseConceptType {
-    // deploymentNeeded: boolean;
-    completed: boolean;
-}
-
-export enum CurrentDevState {
-    IDLE,
-    PHASE_GENERATING,
-    PHASE_IMPLEMENTING,
-    REVIEWING,
-    FINALIZING,
-}
-
-export const MAX_PHASES = 10;
-
-/** Common state fields for all agent behaviors */
-export interface BaseProjectState {
+/** Agent state — agentic only (phasic removed) */
+export interface AgentState {
     behaviorType: BehaviorType;
     projectType: ProjectType;
     
@@ -40,7 +24,7 @@ export interface BaseProjectState {
     sessionId: string;
     hostname: string;
 
-    blueprint: Blueprint;
+    blueprint: AgenticBlueprint;
 
     templateName: string | 'custom';
     
@@ -60,25 +44,22 @@ export interface BaseProjectState {
     lastPackageJson?: string;
     pendingUserInputs: string[];
     projectUpdatesAccumulator: string[];
-    
-    // Deep debug
-    lastDeepDebugTranscript: string | null;
 
     mvpGenerated: boolean;
     reviewingInitiated: boolean;
+
+    // Agentic-specific
+    currentPlan: Plan;
 }
 
-/** Phasic agent state */
-export interface PhasicState extends BaseProjectState {
-    behaviorType: 'phasic';
-    blueprint: PhasicBlueprint;
-    generatedPhases: PhaseState[];
-    
-    phasesCounter: number;
-    currentDevState: CurrentDevState;
-    reviewCycles?: number;
-    currentPhase?: PhaseConceptType;
-}
+/** @deprecated Alias kept for backward compatibility during migration */
+export type AgenticState = AgentState;
+
+/** @deprecated Alias kept for backward compatibility during migration */
+export type BaseProjectState = AgentState;
+
+/** @deprecated Phasic state removed — maps to AgentState for backward compat */
+export type PhasicState = AgentState;
 
 export interface WorkflowMetadata {
     name: string;
@@ -108,12 +89,3 @@ export interface WorkflowMetadata {
         }>;
     };
 }
-
-/** Agentic agent state */
-export interface AgenticState extends BaseProjectState {
-    behaviorType: 'agentic';
-    blueprint: AgenticBlueprint;
-    currentPlan: Plan;
-}
-
-export type AgentState = PhasicState | AgenticState;

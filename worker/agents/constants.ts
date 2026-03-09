@@ -124,8 +124,6 @@ export const MAX_LLM_MESSAGES = 200;
 export const MAX_TOOL_CALLING_DEPTH_DEFAULT = 7;
 export const getMaxToolCallingDepth = (agentActionKey: AgentActionKey | 'testModelConfig') => {
     switch (agentActionKey) {
-        case 'deepDebugger':
-            return 40;
         case 'agenticProjectBuilder':
             return 100;
         default:

@@ -1,7 +1,7 @@
 import { Agent, AgentContext, ConnectionContext } from "agents";
 import { AgentInitArgs, AgentSummary, DeployOptions, DeployResult, ExportOptions, ExportResult, DeploymentTarget, BehaviorType } from "./types";
-import { AgenticState, AgentState, BaseProjectState, CurrentDevState, MAX_PHASES, PhasicState } from "./state";
-import { Blueprint } from "../schemas";
+import { AgentState, BaseProjectState } from "./state";
+import { AgenticBlueprint } from "../schemas";
 import { BaseCodingBehavior } from "./behaviors/base";
 import { createObjectLogger, StructuredLogger } from '../../logger';
 import { InferenceMetadata } from "../inferutils/config.types";
@@ -11,7 +11,6 @@ import { FileManager } from '../services/implementations/FileManager';
 import { DeploymentManager } from '../services/implementations/DeploymentManager';
 import { GitVersionControl } from '../git';
 import { StateManager } from '../services/implementations/StateManager';
-import { PhasicCodingBehavior } from './behaviors/phasic';
 import { AgenticCodingBehavior } from './behaviors/agentic';
 import { SqlExecutor } from '../git';
 import { AgentInfrastructure } from "./AgentCore";
@@ -63,13 +62,13 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
     // ==========================================
     
     initialState = {
-        behaviorType: 'unknown' as BehaviorType,
+        behaviorType: 'agentic' as BehaviorType,
         projectType: 'unknown' as ProjectType,
         projectName: "",
         query: "",
         sessionId: '',
         hostname: '',
-        blueprint: {} as unknown as Blueprint,
+        blueprint: {} as unknown as AgenticBlueprint,
         templateName: '',
         generatedFilesMap: {},
         conversationMessages: [],
@@ -80,12 +79,9 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
         lastPackageJson: '',
         pendingUserInputs: [],
         projectUpdatesAccumulator: [],
-        lastDeepDebugTranscript: null,
         mvpGenerated: false,
         reviewingInitiated: false,
-        generatedPhases: [],
-        currentDevState: CurrentDevState.IDLE,
-        phasesCounter: MAX_PHASES,
+        currentPlan: '',
     } as AgentState;
 
     constructor(ctx: AgentContext, env: Env) {
@@ -116,8 +112,8 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
             10, // MAX_COMMANDS_HISTORY
         );
     }
-    private createObjective(projectType: ProjectType): ProjectObjective<BaseProjectState> {
-        return new ProjectObjective(this as AgentInfrastructure<BaseProjectState>, projectType);
+    private createObjective(projectType: ProjectType): ProjectObjective<AgentState> {
+        return new ProjectObjective(this as AgentInfrastructure<AgentState>, projectType);
     }
 
     /**
@@ -125,7 +121,7 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
      * Only called once in an app's lifecycle
      */
     async initialize(
-        initArgs: AgentInitArgs<AgentState>,
+        initArgs: AgentInitArgs,
         ..._args: unknown[]
     ): Promise<AgentState> {
         const { inferenceContext } = initArgs;
@@ -165,14 +161,9 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
 
         this.logger().info('Bootstrapping CodeGeneratorAgent', { props });
         const agentProps = props as AgentBootstrapProps;
-        const behaviorType = agentProps?.behaviorType ?? this.state.behaviorType ?? 'phasic';
         const projectType = agentProps?.projectType ?? this.state.projectType ?? 'app';
 
-        if (behaviorType === 'phasic') {
-            this.behavior = new PhasicCodingBehavior(this as AgentInfrastructure<PhasicState>, projectType);
-        } else {
-            this.behavior = new AgenticCodingBehavior(this as AgentInfrastructure<AgenticState>, projectType);
-        }
+        this.behavior = new AgenticCodingBehavior(this as AgentInfrastructure<AgentState>, projectType);
         
         // Create objective based on project type
         this.objective = this.createObjective(projectType);
@@ -301,7 +292,7 @@ export class CodeGeneratorAgent extends Agent<Env, AgentState> implements AgentI
     /**
      * Get the project objective (defines what is being built)
      */
-    getObjective(): ProjectObjective<BaseProjectState> {
+    getObjective(): ProjectObjective<AgentState> {
         return this.objective;
     }
     

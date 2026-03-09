@@ -172,20 +172,19 @@ export class StateMigration {
 
         let migratedBehaviorType = state.behaviorType;
         const rawBehaviorType = stateRecord.behaviorType;
-        const hasValidBehaviorType = rawBehaviorType === 'phasic' || rawBehaviorType === 'agentic';
 
-        if (!hasField(state, 'behaviorType') || !hasValidBehaviorType) {
-            migratedBehaviorType = 'phasic';
+        // All legacy phasic agents are migrated to agentic
+        if (!hasField(state, 'behaviorType') || rawBehaviorType === 'phasic' || (rawBehaviorType !== 'agentic')) {
+            migratedBehaviorType = 'agentic';
             needsMigration = true;
-            logger.info('Adding default behaviorType for legacy state', { behaviorType: migratedBehaviorType });
+            logger.info('Migrating behaviorType to agentic', { previousType: rawBehaviorType });
         }
 
         if (isStateWithAgentMode(state)) {
-            migratedBehaviorType = state.agentMode === 'smart' ? 'agentic' : 'phasic';
+            migratedBehaviorType = 'agentic';
             needsMigration = true;
-            logger.info('Migrating agentMode to behaviorType', {
+            logger.info('Migrating agentMode to behaviorType agentic', {
                 oldMode: state.agentMode,
-                newType: migratedBehaviorType,
             });
         }
 

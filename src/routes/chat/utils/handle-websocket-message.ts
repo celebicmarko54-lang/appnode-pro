@@ -1,5 +1,5 @@
 import type { WebSocket } from 'partysocket';
-import type { WebSocketMessage, BlueprintType, ConversationMessage, AgentState, PhasicState, BehaviorType, ProjectType, TemplateDetails } from '@/api-types';
+import type { WebSocketMessage, BlueprintType, ConversationMessage, BehaviorType, ProjectType, TemplateDetails } from '@/api-types';
 import { deduplicateMessages, isAssistantMessageDuplicate } from './deduplicate-messages';
 import { logger } from '@/utils/logger';
 import { getFileType } from '@/utils/string';
@@ -25,15 +25,8 @@ import type { FileType } from '@/api-types';
 import { toast } from 'sonner';
 import { createRepairingJSONParser } from '@/utils/ndjson-parser/ndjson-parser';
 
-const isPhasicState = (state: AgentState): state is PhasicState => {
-	const record = state as unknown as Record<string, unknown>;
-	const behaviorType = record.behaviorType;
-	if (behaviorType === 'phasic') return true;
-	if (behaviorType === undefined || behaviorType === null) {
-		return Array.isArray(record.generatedPhases);
-	}
-	return false;
-};
+/** @deprecated Phasic behavior removed — always returns false */
+// isPhasicState removed — agentic-only mode
 
 export interface HandleMessageDeps {
     // State setters
@@ -186,7 +179,7 @@ export function createWebSocketMessageHandler(deps: HandleMessageDeps) {
                 if (!isInitialStateRestored) {
                     logger.debug('📥 Performing initial state restoration');
 
-                    const restoredBehaviorType = state.behaviorType ?? 'phasic';
+                    const restoredBehaviorType = state.behaviorType ?? 'agentic';
                     if (restoredBehaviorType !== behaviorType) {
                         setBehaviorType(restoredBehaviorType);
                         logger.debug('🔄 Restored behaviorType from backend:', restoredBehaviorType);
@@ -244,50 +237,6 @@ export function createWebSocketMessageHandler(deps: HandleMessageDeps) {
                         );
                     }
 
-                    if (isPhasicState(state) && state.generatedPhases.length > 0 && phaseTimeline.length === 0) {
-                        logger.debug('📋 Restoring phase timeline:', state.generatedPhases);
-                        // If not actively generating, mark incomplete phases as cancelled (they were interrupted)
-                        const isActivelyGenerating = state.shouldBeGenerating === true;
-                        
-                        const timeline = state.generatedPhases.map((phase, index: number) => {
-                            // Determine phase status:
-                            // - completed if explicitly marked complete
-                            // - cancelled if incomplete and not actively generating (interrupted)
-                            // - generating if incomplete and actively generating
-                            const phaseStatus = phase.completed 
-                                ? 'completed' as const 
-                                : !isActivelyGenerating 
-                                    ? 'cancelled' as const 
-                                    : 'generating' as const;
-                            
-                            return {
-                                id: `phase-${index}`,
-                                name: phase.name,
-                                description: phase.description,
-                                status: phaseStatus,
-                                files: phase.files.map(filesConcept => {
-                                    const file = state.generatedFilesMap?.[filesConcept.path];
-                                    // File status:
-                                    // - completed if it exists in generated files
-                                    // - cancelled if missing and not actively generating (interrupted)
-                                    // - generating if missing and actively generating
-                                    const fileStatus = file 
-                                        ? 'completed' as const 
-                                        : !isActivelyGenerating 
-                                            ? 'cancelled' as const 
-                                            : 'generating' as const;
-                                    return {
-                                        path: filesConcept.path,
-                                        purpose: filesConcept.purpose,
-                                        status: fileStatus,
-                                        contents: file?.fileContents
-                                    };
-                                }),
-                                timestamp: Date.now(),
-                            };
-                        });
-                        setPhaseTimeline(timeline);
-                    }
                     
                     updateStage('bootstrap', { status: 'completed' });
                     
@@ -381,9 +330,9 @@ export function createWebSocketMessageHandler(deps: HandleMessageDeps) {
 
             case 'conversation_state': {
                 if (message.type !== 'conversation_state') break;
-                const { state, deepDebugSession } = message;
+                const { state } = message;
                 const history: ReadonlyArray<ConversationMessage> = state?.runningHistory ?? [];
-                logger.debug('Received conversation_state with messages:', history.length, 'deepDebugSession:', deepDebugSession);
+                logger.debug('Received conversation_state with messages:', history.length);
 
                 const restoredMessages: ChatMessage[] = [];
                 let currentAssistant: ChatMessage | null = null;
@@ -445,52 +394,6 @@ export function createWebSocketMessageHandler(deps: HandleMessageDeps) {
                             result: text || undefined,
                             contentLength: currentAssistant.content.length,
                         });
-                    }
-                }
-
-                // Restore active debug session if one is running
-                if (deepDebugSession?.conversationId) {
-                    setIsDebugging(true);
-                    
-                    // Find if there's already a message with this conversationId
-                    const existingMessageIndex = restoredMessages.findIndex(
-                        m => m.role === 'assistant' && m.conversationId === deepDebugSession.conversationId
-                    );
-                    
-                    if (existingMessageIndex !== -1) {
-                        // Update existing message to show as active debug
-                        const existingMessage = restoredMessages[existingMessageIndex];
-                        if (!existingMessage.ui) existingMessage.ui = {};
-                        if (!existingMessage.ui.toolEvents) existingMessage.ui.toolEvents = [];
-                        
-                        const debugEventIndex = existingMessage.ui.toolEvents.findIndex(e => e.name === 'deep_debug');
-                        if (debugEventIndex === -1) {
-                            existingMessage.ui.toolEvents.push({
-                                name: 'deep_debug',
-                                status: 'start',
-                                timestamp: Date.now(),
-                                contentLength: 0
-                            });
-                        } else {
-                            existingMessage.ui.toolEvents[debugEventIndex].status = 'start';
-                            existingMessage.ui.toolEvents[debugEventIndex].contentLength = 0;
-                        }
-                    } else {
-                        // Create new placeholder message with the active conversationId
-                        const debugBubble: ChatMessage = {
-                            role: 'assistant',
-                            conversationId: deepDebugSession.conversationId,
-                            content: 'Deep debug session in progress...',
-                            ui: {
-                                toolEvents: [{
-                                    name: 'deep_debug',
-                                    status: 'start',
-                                    timestamp: Date.now(),
-                                    contentLength: 0
-                                }]
-                            }
-                        };
-                        restoredMessages.push(debugBubble);
                     }
                 }
 

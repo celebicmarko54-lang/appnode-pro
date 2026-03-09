@@ -35,7 +35,7 @@ const resolveBehaviorType = (body: CodeGenArgs): BehaviorType => {
     const pt = body.projectType;
     if (pt === 'presentation' || pt === 'workflow' || pt === 'general') return 'agentic';
     // default (including 'app' and when projectType omitted)
-    return 'phasic';
+    return 'agentic';
 };
 
 const resolveProjectType = (body: CodeGenArgs): ProjectType | 'auto' => {

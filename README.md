@@ -46,12 +46,13 @@ Let your customers extend your product's functionality without learning your API
 
 ### 🎯 Key Features
 
-🤖 **AI Code Generation** – Phase-wise development with intelligent error correction  
+🤖 **AI Code Generation** – Autonomous agentic generation powered by Claude Opus 4.6  
 ⚡ **Live Previews** – App previews running in sandboxed containers  
 💬 **Interactive Chat** – Guide development through natural conversation  
 📱 **Modern Stack** – Generates React + TypeScript + Tailwind apps  
 🚀 **One-Click Deploy** – Deploy generated apps to Workers for Platforms  
 📦 **GitHub Integration** – Export code directly to your repositories  
+🔧 **Surgical Code Editing** – AI uses precise edit, multi-edit, and create-file tools for targeted changes  
 
 ### 🏗️ Built on Cloudflare's Platform
 
@@ -60,7 +61,7 @@ Cloudflare VibeSDK Build utilizes the full Cloudflare developer ecosystem:
 - **Frontend**: React + Vite with modern UI components
 - **Backend**: Workers with Durable Objects for AI agents  
 - **Database**: D1 (SQLite) with Drizzle ORM
-- **AI**: Multiple LLM providers via AI Gateway
+- **AI**: Claude Opus 4.6 (primary) via AI Gateway, with fallback providers
 - **Containers**: Sandboxed app previews and execution
 - **Storage**: R2 buckets for templates, KV for sessions
 - **Deployment**: Workers for Platforms with dispatch namespaces
@@ -74,9 +75,9 @@ npm install @cf-vibesdk/sdk
 ```
 
 ```ts
-import { PhasicClient } from '@cf-vibesdk/sdk';
+import { AgenticClient } from '@cf-vibesdk/sdk';
 
-const client = new PhasicClient({
+const client = new AgenticClient({
   baseUrl: 'https://build.cloudflare.dev',
   apiKey: process.env.VIBESDK_API_KEY!,
 });
@@ -103,7 +104,7 @@ Before clicking "Deploy to Cloudflare", have these ready:
 - Advanced Certificate Manager (needed when you map a first-level subdomain such as `abc.xyz.com` so Cloudflare can issue the required wildcard certificate for preview apps on `*.abc.xyz.com`)
 
 ### 🔑 Required API Key
-- **Google Gemini API Key** - Get from [ai.google.dev](https://ai.google.dev)
+- **Anthropic API Key** - Get from [console.anthropic.com](https://console.anthropic.com) (Claude Opus 4.6 — primary model)
 
 Once you click "Deploy to Cloudflare", you'll be taken to your Cloudflare dashboard where you can configure your VibeSDK deployment with these variables. 
 
@@ -111,7 +112,7 @@ Once you click "Deploy to Cloudflare", you'll be taken to your Cloudflare dashbo
 
 ### 🔑 What you'll configure
 
-- `GOOGLE_AI_STUDIO_API_KEY` - Your Google Gemini API key for Gemini models
+- `ANTHROPIC_API_KEY` - Your Anthropic API key for Claude Opus 4.6 (primary model)
 - `JWT_SECRET` - Secure random string for session management
 - `WEBHOOK_SECRET` - Webhook authentication secret
 - `SECRETS_ENCRYPTION_KEY` - Encryption key for secrets
@@ -228,24 +229,34 @@ OAuth configuration is **not** shown on the initial deploy page. If you want use
 
 ```mermaid
 graph TD
-    A[User Describes App] --> B[AI Agent Analyzes Request]
-    B --> C[Generate Blueprint & Plan]
-    C --> D[Phase-wise Code Generation]
-    D --> E[Live Preview in Container]
-    E --> F[User Feedback & Iteration]
-    F --> D
-    D --> G[Deploy to Workers for Platforms]
+    A["User Describes App"] --> B["AI Agent Analyzes Request"]
+    B --> C["Generate Blueprint & Plan"]
+    C --> D["Autonomous Code Generation"]
+    D --> E["Live Preview in Container"]
+    E --> F{"User Satisfied?"}
+    F -- "No" --> G["Chat: Refine & Edit"]
+    G --> D
+    F -- "Yes" --> H["Deploy to Workers for Platforms"]
+
+    subgraph "Agentic Tool Loop"
+        D --> D1["generate_files"]
+        D --> D2["edit_file"]
+        D --> D3["multi_edit_files"]
+        D --> D4["create_file"]
+        D --> D5["run_analysis"]
+        D --> D6["exec_commands"]
+    end
 ```
 
 ### How It Works
 
-1. **🧠 AI Analysis**: Language models process your description
-2. **📋 Blueprint Creation**: System architecture and file structure planned
-3. **⚡ Phase Generation**: Code generated incrementally with dependency management
-4. **🔍 Quality Assurance**: Automated linting, type checking, and error correction
-5. **📱 Live Preview**: App execution in isolated Cloudflare Containers
-6. **🔄 Real-time Iteration**: Chat interface enables continuous refinements
-7. **🚀 One-Click Deploy**: Generated apps deploy to Workers for Platforms
+1. **AI Analysis**: Claude Opus 4.6 processes your description with adaptive thinking
+2. **Blueprint Creation**: System architecture, file structure, and implementation plan generated
+3. **Autonomous Generation**: The AI agent runs in a continuous tool-calling loop, generating files, editing code, running analysis, and fixing errors on its own
+4. **Surgical Editing**: For changes, the agent uses precise `edit_file` and `multi_edit_files` tools instead of regenerating entire files
+5. **Live Preview**: App executes in isolated Cloudflare Containers with real-time updates
+6. **Conversational Iteration**: Chat interface enables continuous refinements — the agent edits, rebuilds, and validates
+7. **One-Click Deploy**: Generated apps deploy to Workers for Platforms
 
 ## 💡 Try These Example Prompts
 
@@ -283,14 +294,61 @@ Want to see these prompts in action? **[Visit the live demo at build.cloudflare.
 
 ## 🌍 Architecture Deep Dive
 
+```mermaid
+graph TB
+    subgraph "Frontend"
+        UI["React + Vite + TailwindCSS"]
+        WS["WebSocket (PartySocket)"]
+    end
+
+    subgraph "Cloudflare Workers"
+        API["Worker Entry Point"]
+        API --> DO["Durable Object<br/>CodeGeneratorAgent"]
+        API --> Auth["OAuth (GitHub, Google)"]
+        API --> RL["Rate Limiter DO"]
+    end
+
+    subgraph "AI Agent (Durable Object)"
+        DO --> Agent["AgenticCodingBehavior"]
+        Agent --> Tools["25+ LLM Tools"]
+        Agent --> LLM["Claude Opus 4.6<br/>via AI Gateway"]
+        Tools --> GF["generate_files"]
+        Tools --> EF["edit_file"]
+        Tools --> MEF["multi_edit_files"]
+        Tools --> CF["create_file"]
+        Tools --> RA["run_analysis"]
+        Tools --> EC["exec_commands"]
+    end
+
+    subgraph "Storage"
+        D1["D1 (SQLite)<br/>Users, Apps, Sessions"]
+        R2["R2 Bucket<br/>Templates"]
+        KV["KV Store<br/>Sessions"]
+        Secrets["UserSecretsStore DO<br/>Encrypted API Keys"]
+    end
+
+    subgraph "Runtime"
+        Sandbox["Cloudflare Containers<br/>Live App Preview"]
+        Git["isomorphic-git<br/>SQLite Filesystem"]
+        Deploy["Workers for Platforms<br/>App Deployment"]
+    end
+
+    UI <--> WS <--> DO
+    DO --> D1
+    DO --> R2
+    DO --> Sandbox
+    DO --> Git
+    DO --> Deploy
+    DO --> Secrets
+```
+
 ### Durable Objects for Stateful AI Agents
 ```typescript
-class CodeGeneratorAgent extends DurableObject {
-  async generateCode(prompt: string) {
-    // Persistent state across WebSocket connections
-    // Phase-wise generation with error recovery
-    // Real-time progress streaming to frontend
-  }
+class CodeGeneratorAgent extends Agent<Env, AgentState> {
+  // Each chat session = one Durable Object instance
+  // Persistent state: blueprint, files, plan, sandbox
+  // Single agentic behavior — Claude Opus 4.6 in a tool-calling loop
+  // Real-time progress streaming via WebSocket
 }
 ```
 
@@ -306,15 +364,15 @@ export default {
 };
 ```
 
-### Iteration-based Code Generation
-Cloudflare VibeSDK generates apps in intelligent phases:
+### Autonomous Agentic Generation
+Cloudflare VibeSDK uses a single AI agent that operates autonomously in a continuous tool-calling loop:
 
-1. **Planning Phase**: Analyzes requirements, creates file structure
-2. **Foundation Phase**: Generates package.json, basic setup files  
-3. **Core Phase**: Creates main components and logic
-4. **Styling Phase**: Adds CSS and visual design
-5. **Integration Phase**: Connects APIs and external services
-6. **Optimization Phase**: Performance improvements and error fixes
+1. **Blueprint**: Analyzes requirements, creates architecture plan
+2. **Generation**: Agent generates files using `generate_files`, `create_file`, and `edit_file` tools
+3. **Validation**: Agent runs analysis, checks errors, and fixes issues automatically
+4. **Iteration**: Agent continues building until the app is complete, then signals done
+
+The agent has 25+ tools available including file reading, code analysis, command execution, runtime error detection, and surgical code editing — giving it full autonomy to build, test, and fix applications without predefined phases.
 
 ---
 
@@ -477,7 +535,7 @@ Cloudflare VibeSDK implements enterprise-grade security:
 - Check that your account has D1 access enabled
 
 **🔐 "Missing Required Variables"**
-- **Worker Secrets**: Verify all required secrets are set: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_AI_STUDIO_API_KEY`, `JWT_SECRET`
+- **Worker Secrets**: Verify all required secrets are set: `ANTHROPIC_API_KEY`, `JWT_SECRET`
 - **AI Gateway Token**: `CLOUDFLARE_AI_GATEWAY_TOKEN` should be set as BOTH build variable and worker secret
 - **Environment Variables**: These are automatically loaded from wrangler.jsonc - no manual setup needed
 - **Authentication**: API tokens and account IDs are automatically provided by Workers Builds

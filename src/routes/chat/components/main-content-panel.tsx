@@ -182,7 +182,7 @@ export function MainContentPanel(props: MainContentPanelProps) {
 			>
 				<FeaturePreviewComponent
 					projectType={projectType}
-					behaviorType={behaviorType ?? 'phasic'}
+					behaviorType={behaviorType ?? 'agentic'}
 					previewUrl={previewUrl}
 					websocket={websocket}
 					files={allFiles}
@@ -222,7 +222,7 @@ export function MainContentPanel(props: MainContentPanelProps) {
 			<Suspense fallback={null}>
 				<FeatureHeaderActionsComponent
 					projectType={projectType}
-					behaviorType={behaviorType ?? 'phasic'}
+					behaviorType={behaviorType ?? 'agentic'}
 					previewUrl={previewUrl}
 					websocket={websocket}
 					files={allFiles}

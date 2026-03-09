@@ -1,15 +1,12 @@
 
 import { AgentInitArgs } from '../types';
-import { AgenticState } from '../state';
+import { AgentState } from '../state';
 import { WebSocketMessageResponses } from '../../constants';
 import { UserConversationProcessor } from '../../operations/UserConversationProcessor';
 import { GenerationContext, AgenticGenerationContext } from '../../domain/values/GenerationContext';
-import { PhaseImplementationOperation } from '../../operations/PhaseImplementation';
 import { FileRegenerationOperation } from '../../operations/FileRegeneration';
 import { AgenticProjectBuilderOperation, AgenticProjectBuilderInputs } from '../../operations/AgenticProjectBuilder';
 import { buildToolCallRenderer } from '../../operations/UserConversationProcessor';
-import { PhaseGenerationOperation } from '../../operations/PhaseGeneration';
-import { FastCodeFixerOperation } from '../../operations/PostPhaseCodeFixer';
 import { customizeTemplateFiles, generateProjectName } from '../../utils/templateCustomizer';
 import { IdGenerator } from '../../utils/idGenerator';
 import { generateNanoId } from '../../../utils/idGenerator';
@@ -23,24 +20,16 @@ import { AbortError } from 'worker/agents/inferutils/core';
 import { ImageAttachment, ProcessedImageAttachment } from 'worker/types/image-attachment';
 import { ImageType, uploadImage } from 'worker/utils/images';
 
-interface AgenticOperations extends BaseCodingOperations {
-    generateNextPhase: PhaseGenerationOperation;
-    implementPhase: PhaseImplementationOperation;
-}
-
 /**
- * AgenticCodingBehavior
+ * AgenticCodingBehavior — single agentic loop with tool-calling
  */
-export class AgenticCodingBehavior extends BaseCodingBehavior<AgenticState> implements ICodingAgent {
+export class AgenticCodingBehavior extends BaseCodingBehavior<AgentState> implements ICodingAgent {
     protected static readonly PROJECT_NAME_PREFIX_MAX_LENGTH = 20;
 
-    protected operations: AgenticOperations = {
+    protected operations: BaseCodingOperations = {
         regenerateFile: new FileRegenerationOperation(),
-        fastCodeFixer: new FastCodeFixerOperation(),
         processUserMessage: new UserConversationProcessor(),
         simpleGenerateFiles: new SimpleCodeGenerationOperation(),
-        generateNextPhase: new PhaseGenerationOperation(),
-        implementPhase: new PhaseImplementationOperation(),
     };
 
     // Conversation sync tracking
@@ -52,9 +41,9 @@ export class AgenticCodingBehavior extends BaseCodingBehavior<AgenticState> impl
      * Sets up services and begins deployment process
      */
     async initialize(
-        initArgs: AgentInitArgs<AgenticState>,
+        initArgs: AgentInitArgs,
         ..._args: unknown[]
-    ): Promise<AgenticState> {
+    ): Promise<AgentState> {
         await super.initialize(initArgs);
 
         const { query, hostname, inferenceContext, templateInfo, sandboxSessionId } = initArgs;

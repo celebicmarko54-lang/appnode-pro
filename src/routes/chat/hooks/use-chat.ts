@@ -478,7 +478,7 @@ export function useChat({
 					} = {
 						websocketUrl: '',
 						agentId: '',
-						behaviorType: 'phasic',
+						behaviorType: 'agentic',
 						projectType: 'app',
 						template: {
 							files: [],
@@ -487,7 +487,7 @@ export function useChat({
 
 					let startedBlueprintStream = false;
 					const initialBehaviorType = getBehaviorTypeForProject(projectType);
-					if (initialBehaviorType === 'phasic') {
+					if (initialBehaviorType !== 'agentic') {
 						sendMessage(
 							createAIMessage('main', "Sure, let's get started. Bootstrapping the project first...", true),
 						);
@@ -541,7 +541,7 @@ export function useChat({
 					updateStage('blueprint', { status: 'completed' });
 					setIsGeneratingBlueprint(false);
 					const finalBehaviorType = getBehaviorTypeForProject(projectType);
-					if (finalBehaviorType === 'phasic') {
+					if (finalBehaviorType !== 'agentic') {
 						sendMessage(
 							createAIMessage('main', 'Blueprint generation complete. Now starting the code generation...', true),
 						);
@@ -655,17 +655,6 @@ export function useChat({
 			};
 		}
 	}, [edit]);
-
-	// Track debugging state based on deep_debug tool events in messages
-	useEffect(() => {
-		const hasActiveDebug = messages.some(msg => 
-			msg.role === 'assistant' && 
-			msg.ui?.toolEvents?.some(event => 
-				event.name === 'deep_debug' && event.status === 'start'
-			)
-		);
-		setIsDebugging(hasActiveDebug);
-	}, [messages]);
 
 	// Control functions for deployment and generation
 	const handleStopGeneration = useCallback(() => {

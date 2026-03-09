@@ -436,6 +436,29 @@ const claude_thinking_budget_tokens = {
     minimal: 1000,
 };
 
+/**
+ * Build extra_body for Claude models.
+ * Opus 4.6+ uses adaptive thinking; older Claude models use explicit budget_tokens.
+ */
+function buildClaudeThinkingBody(modelName: string, reasoning_effort?: ReasoningEffort): Record<string, unknown> {
+    const isOpus46 = modelName.includes('claude-opus-4');
+    if (isOpus46) {
+        return {
+            extra_body: {
+                thinking: { type: 'adaptive' },
+            },
+        };
+    }
+    return {
+        extra_body: {
+            thinking: {
+                type: 'enabled',
+                budget_tokens: claude_thinking_budget_tokens[reasoning_effort ?? 'medium'],
+            },
+        },
+    };
+}
+
 export type InferResponseObject<OutputSchema extends z.AnyZodObject> = {
     object: z.infer<OutputSchema>;
     toolCallContext?: ToolCallContext;
@@ -573,15 +596,11 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
             schema && schemaName && !format
                 ? { response_format: zodResponseFormat(schema, schemaName) }
                 : {};
-        const extraBody = modelName.includes('claude')? {
-                    extra_body: {
-                        thinking: {
-                            type: 'enabled',
-                            budget_tokens: claude_thinking_budget_tokens[reasoning_effort ?? 'medium'],
-                        },
-                    },
-                }
-            : {};
+        const isClaude = modelName.includes('claude');
+        const extraBody = isClaude ? buildClaudeThinkingBody(modelName, reasoning_effort) : {};
+
+        // Claude with thinking does not support temperature or top_k
+        const safeTemperature = isClaude ? undefined : temperature;
 
         // Optimize messages to reduce token count
         const optimizedMessages = optimizeInputs(messages);
@@ -690,7 +709,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                 max_completion_tokens: maxTokens || 150000,
                 stream: stream ? true : false,
                 reasoning_effort: modelConfig.nonReasoning ? undefined : reasoning_effort,
-                temperature,
+                temperature: safeTemperature,
                 frequency_penalty,
             }, {
                 signal: abortSignal,

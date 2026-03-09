@@ -1,9 +1,9 @@
 import { FileTreeNode, RuntimeError, StaticAnalysisResponse, TemplateDetails } from "../services/sandbox/sandboxTypes";
 import { TemplateRegistry } from "./inferutils/schemaFormatters";
 import z from 'zod';
-import { PhasicBlueprint, AgenticBlueprint, BlueprintSchemaLite, AgenticBlueprintSchema, FileOutputType, PhaseConceptLiteSchema, PhaseConceptSchema, PhaseConceptType, TemplateSelection, Blueprint } from "./schemas";
+import { AgenticBlueprint, AgenticBlueprintSchema, FileOutputType, PhaseConceptLiteSchema, PhaseConceptSchema, PhaseConceptType, TemplateSelection, Blueprint } from "./schemas";
 import { IssueReport } from "./domain/values/IssueReport";
-import { FileState, MAX_PHASES } from "./core/state";
+import { FileState } from "./core/state";
 import { CODE_SERIALIZERS, CodeSerializerType } from "./utils/codeSerializers";
 import { getCodebaseContext } from "./utils/codebaseContext";
 
@@ -793,7 +793,7 @@ export const STRATEGIES_UTILS = {
         **If auth functionality is required, provide mock auth functionality primarily. Provide real auth functionality ONLY IF template has persistence layer. Remember to seed the persistence layer with mock data AND Always PREFILL the UI with mock credentials. No oauth needed**
 
         **Applications with single view/page or mostly static content are considered **Simple Projects** and those with multiple views/pages are considered **Complex Projects** and should be designed accordingly.**
-        * **Phase Count:** Aim for a maximum of 1 phase for simple applications and 3-7 phases for complex applications. Each phase should be self-contained. Do not exceed more than ${Math.floor(MAX_PHASES * 0.8)} phases unless addressing complex client requirements or feedbacks.
+        * **Phase Count:** Aim for a maximum of 1 phase for simple applications and 3-7 phases for complex applications. Each phase should be self-contained.
         * **File Count:** Aim for a maximum of 1-3 files per phase when each file is big and self-container, or 8-12 files per phase when most files are small (< 100 lines).
         * The number of files in the project should be proportional to the number of views/pages that the project has.
         * Keep the size of codebase as small as possible, write encapsulated and abstracted code that can be reused, maximize code and component reuse and modularity. If a function/component is to be used in multiple files, it should be defined in a shared file.
@@ -881,21 +881,12 @@ export function generalSystemPromptBuilder(
         variables.dependencies = JSON.stringify(params.dependencies ?? {});
     }
 
-    // Blueprint variables - discriminate by type
+    // Blueprint variables
     if (params.blueprint) {
-        if ('implementationRoadmap' in params.blueprint) {
-            // Phasic blueprint
-            const phasicBlueprint = params.blueprint as PhasicBlueprint;
-            const blueprintForPrompt = { ...phasicBlueprint, initialPhase: undefined };
-            variables.blueprint = TemplateRegistry.markdown.serialize(blueprintForPrompt, BlueprintSchemaLite);
-            variables.blueprintDependencies = phasicBlueprint.frameworks?.join(', ') ?? '';
-        } else {
-            // Agentic blueprint
-            const agenticBlueprint = params.blueprint as AgenticBlueprint;
-            variables.blueprint = TemplateRegistry.markdown.serialize(agenticBlueprint, AgenticBlueprintSchema);
-            variables.blueprintDependencies = agenticBlueprint.frameworks?.join(', ') ?? '';
-            variables.agenticPlan = agenticBlueprint.plan.map((step, i) => `${i + 1}. ${step}`).join('\n');
-        }
+        const agenticBlueprint = params.blueprint as AgenticBlueprint;
+        variables.blueprint = TemplateRegistry.markdown.serialize(agenticBlueprint, AgenticBlueprintSchema);
+        variables.blueprintDependencies = agenticBlueprint.frameworks?.join(', ') ?? '';
+        variables.agenticPlan = agenticBlueprint.plan.map((step, i) => `${i + 1}. ${step}`).join('\n');
     }
 
     // Optional language and frameworks

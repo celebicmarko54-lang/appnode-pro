@@ -289,14 +289,6 @@ export class BuildSession {
 
 	async waitForDeployable(options: WaitOptions = {}): Promise<SessionDeployable> {
 		const timeoutMs = options.timeoutMs ?? this.getDefaultTimeoutMs();
-		if (this.behaviorType === 'phasic') {
-			await this.waitForPhase({ type: 'phase_validated', timeoutMs });
-			return {
-				files: this.workspace.paths().length,
-				reason: 'phase_validated',
-				previewUrl: this.state.get().previewUrl,
-			};
-		}
 
 		await this.waitForGenerationComplete({ timeoutMs });
 		return {

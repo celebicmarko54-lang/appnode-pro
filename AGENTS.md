@@ -24,4 +24,4 @@
 
 ## Key Patterns
 - **Add API endpoint:** types in `src/api-types.ts` -> `src/lib/api-client.ts` -> service in `worker/database/services/` -> controller in `worker/api/controllers/` -> route in `worker/api/routes/`
-- **Add LLM tool:** create in `worker/agents/tools/toolkit/` -> register in `worker/agents/tools/customTools.ts`
+- **Add LLM tool:** create in `worker/agents/tools/toolkit/` -> register in `worker/agents/tools/customTools.ts` -> register in `worker/agents/operations/AgenticProjectBuilder.ts` -> add docs in `worker/agents/operations/prompts/agenticBuilderPrompts.ts`

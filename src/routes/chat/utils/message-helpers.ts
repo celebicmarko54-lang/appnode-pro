@@ -208,33 +208,7 @@ export function appendToolEvent(
             const startEventIndex = current.findIndex(ev => ev.name === tool.name && ev.status === 'start');
             
             if (startEventIndex !== -1) {
-                const startEvent = current[startEventIndex];
-                const contentChanged = startEvent.contentLength !== currentContentLength;
-                const isDeepDebug = tool.name === 'deep_debug';
-                
-                // For deep_debug with content changes: add new success event at end (chronological)
-                // For other tools: update in place (avoid duplication)
-                if (isDeepDebug && contentChanged) {
-                    // Remove start event and add success event at current position
-                    return {
-                        ...m,
-                        ui: {
-                            ...m.ui,
-                            toolEvents: [
-                                ...current.filter((_, j) => j !== startEventIndex),
-                                {
-                                    name: tool.name,
-                                    status: 'success' as const,
-                                    timestamp,
-                                    contentLength: currentContentLength,
-                                    result: tool.result
-                                }
-                            ]
-                        }
-                    };
-                }
-                
-                // Update in place for other tools or when no content changed
+                // Update in place
                 return {
                     ...m,
                     ui: {
@@ -244,7 +218,7 @@ export function appendToolEvent(
                                 ? { 
                                     name: ev.name, 
                                     status: 'success' as const, 
-                                    timestamp: startEvent.timestamp, // Keep original timestamp for stable React key
+                                    timestamp: ev.timestamp, // Keep original timestamp for stable React key
                                     contentLength: ev.contentLength, // Keep original position
                                     result: tool.result // Add result if provided
                                   }

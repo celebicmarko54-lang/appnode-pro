@@ -174,4 +174,4 @@ export const ConversationalResponseSchema = z.object({
 
 export type ConversationalResponseType = z.infer<typeof ConversationalResponseSchema>;
 
-export type Blueprint = z.infer<typeof PhasicBlueprintSchema> | z.infer<typeof AgenticBlueprintSchema>;
+export type Blueprint = z.infer<typeof AgenticBlueprintSchema>;

@@ -105,8 +105,9 @@ function extractPhaseFiles(
 	return phase?.files;
 }
 
+/** @deprecated Phasic behavior removed — always returns false */
 function isPhasicState(state: AgentState): state is AgentState & { generatedPhases: Array<{ name: string; description: string; files: { path: string; purpose: string }[]; completed: boolean }> } {
-	return state.behaviorType === 'phasic' && 'generatedPhases' in state;
+	return false;
 }
 
 /**

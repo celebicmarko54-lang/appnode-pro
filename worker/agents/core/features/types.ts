@@ -122,7 +122,7 @@ export const DEFAULT_FEATURE_DEFINITIONS: Record<ProjectType, Omit<FeatureDefini
 			hasCustomHeaderActions: true,
 			hasCustomSidebar: false,
 			hasCustomFileFilter: false,
-			behaviorType: 'phasic',
+			behaviorType: 'agentic',
 		},
 	},
 	presentation: {

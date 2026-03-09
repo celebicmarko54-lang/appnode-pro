@@ -4,14 +4,13 @@ import {
     FileOutputType,
     Blueprint,
     AgenticBlueprint,
-    PhasicBlueprint,
 } from '../../schemas';
 import { ExecuteCommandsResponse, PreviewType, RuntimeError, StaticAnalysisResponse, TemplateDetails, TemplateFile } from '../../../services/sandbox/sandboxTypes';
-import { BaseProjectState, AgenticState, FileState } from '../state';
+import { AgentState, FileState } from '../state';
 import { AllIssues, AgentSummary, AgentInitArgs, BehaviorType, DeploymentTarget, ProjectType } from '../types';
 import { WebSocketMessageResponses } from '../../constants';
 import { ProjectSetupAssistant } from '../../assistants/projectsetup';
-import { UserConversationProcessor, RenderToolCall } from '../../operations/UserConversationProcessor';
+import { UserConversationProcessor } from '../../operations/UserConversationProcessor';
 import { FileRegenerationOperation } from '../../operations/FileRegeneration';
 // Database schema imports removed - using zero-storage OAuth flow
 import { BaseSandboxService } from '../../../services/sandbox/BaseSandboxService';
@@ -21,7 +20,6 @@ import { WebSocketMessageData, WebSocketMessageType } from '../../../api/websock
 import { AgentActionKey, InferenceContext, InferenceRuntimeOverrides, ModelConfig } from '../../inferutils/config.types';
 import { ModelConfigService } from '../../../database/services/ModelConfigService';
 import { fixProjectIssues } from '../../../services/code-fixer';
-import { FastCodeFixerOperation } from '../../operations/PostPhaseCodeFixer';
 import { looksLikeCommand, validateAndCleanBootstrapCommands } from '../../utils/common';
 import { customizeTemplateFiles, generateBootstrapScript } from '../../utils/templateCustomizer';
 import { AppService } from '../../../database';
@@ -30,15 +28,12 @@ import { ImageAttachment, type ProcessedImageAttachment } from '../../../types/i
 import { OperationOptions } from '../../operations/common';
 import { ImageType, uploadImage, detectBlankScreenshot } from 'worker/utils/images';
 import { ScreenshotSecurity } from 'worker/utils/screenshot-security';
-import { DeepDebugResult } from '../types';
 import { updatePackageJson } from '../../utils/packageSyncer';
 import { ICodingAgent } from '../../services/interfaces/ICodingAgent';
 import { SimpleCodeGenerationOperation } from '../../operations/SimpleCodeGeneration';
 import { AgentComponent } from '../AgentComponent';
 import type { AgentInfrastructure } from '../AgentCore';
 import { GitVersionControl } from '../../git';
-import { DeepDebuggerOperation } from '../../operations/DeepDebugger';
-import type { DeepDebuggerInputs } from '../../operations/DeepDebugger';
 import { generatePortToken } from 'worker/utils/cryptoUtils';
 import { getPreviewDomain, getProtocolForHost } from 'worker/utils/urls';
 import { isDev } from 'worker/utils/envs';
@@ -56,7 +51,6 @@ const SCREENSHOT_CONFIG = {
 
 export interface BaseCodingOperations {
     regenerateFile: FileRegenerationOperation;
-    fastCodeFixer: FastCodeFixerOperation;
     processUserMessage: UserConversationProcessor;
     simpleGenerateFiles: SimpleCodeGenerationOperation;
 }
@@ -64,7 +58,7 @@ export interface BaseCodingOperations {
 /**
  * Base class for all coding behaviors
  */
-export abstract class BaseCodingBehavior<TState extends BaseProjectState> 
+export abstract class BaseCodingBehavior<TState extends AgentState> 
     extends AgentComponent<TState> implements ICodingAgent {
     protected static readonly MAX_COMMANDS_HISTORY = 10;
 
@@ -76,8 +70,6 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
     protected pendingUserImages: ProcessedImageAttachment[] = []
     protected generationPromise: Promise<void> | null = null;
     protected currentAbortController?: AbortController;
-    protected deepDebugPromise: Promise<{ transcript: string } | { error: string }> | null = null;
-    protected deepDebugConversationId: string | null = null;
 
     protected staticAnalysisCache: StaticAnalysisResponse | null = null;
 
@@ -86,7 +78,6 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
     
     protected operations: BaseCodingOperations = {
         regenerateFile: new FileRegenerationOperation(),
-        fastCodeFixer: new FastCodeFixerOperation(),
         processUserMessage: new UserConversationProcessor(),
         simpleGenerateFiles: new SimpleCodeGenerationOperation(),
     };
@@ -95,7 +86,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
         return this.state.behaviorType;
     }
 
-    protected isAgenticState(state: BaseProjectState): state is AgenticState {
+    protected isAgenticState(state: AgentState): state is AgentState {
         return state.behaviorType === 'agentic';
     }
 
@@ -355,7 +346,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
     async setBlueprint(blueprint: Blueprint): Promise<void> {
         this.setState({
             ...this.state,
-            blueprint: blueprint as AgenticBlueprint | PhasicBlueprint,
+            blueprint: blueprint as AgenticBlueprint,
         });
         this.broadcast(WebSocketMessageResponses.BLUEPRINT_UPDATED, {
             message: 'Blueprint updated',
@@ -472,61 +463,6 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
      * Contains the main logic for code generation and review process
      */
     abstract build(): Promise<void>
-
-    async executeDeepDebug(
-        issue: string,
-        toolRenderer: RenderToolCall,
-        streamCb: (chunk: string) => void,
-        focusPaths?: string[],
-    ): Promise<DeepDebugResult> {
-        const debugPromise = (async () => {
-            try {
-                const previousTranscript = this.state.lastDeepDebugTranscript ?? undefined;
-                const operationOptions = this.getOperationOptions();
-                const filesIndex = operationOptions.context.allFiles
-                    .filter((f) =>
-                        !focusPaths?.length ||
-                        focusPaths.some((p) => f.filePath.includes(p)),
-                    );
-
-                const runtimeErrors = await this.fetchRuntimeErrors(false);
-
-                const inputs: DeepDebuggerInputs = {
-                    issue,
-                    previousTranscript,
-                    filesIndex,
-                    runtimeErrors,
-                    streamCb,
-                    toolRenderer,
-                };
-
-                const operation = new DeepDebuggerOperation();
-
-                const result = await operation.execute(inputs, operationOptions);
-
-                const transcript = result.transcript;
-
-                // Save transcript for next session
-                this.setState({
-                    ...this.state,
-                    lastDeepDebugTranscript: transcript,
-                });
-
-                return { success: true as const, transcript };
-            } catch (e) {
-                this.logger.error('Deep debugger failed', e);
-                return { success: false as const, error: `Deep debugger failed: ${String(e)}` };
-            } finally {
-                this.deepDebugPromise = null;
-                this.deepDebugConversationId = null;
-            }
-        })();
-
-        // Store promise before awaiting
-        this.deepDebugPromise = debugPromise;
-
-        return await debugPromise;
-    }
 
 
     getModelConfigsInfo() {
@@ -1296,28 +1232,15 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
     }
 
     isDeepDebugging(): boolean {
-        return this.deepDebugPromise !== null;
+        return false;
     }
     
     getDeepDebugSessionState(): { conversationId: string } | null {
-        if (this.deepDebugConversationId && this.deepDebugPromise) {
-            return { conversationId: this.deepDebugConversationId };
-        }
         return null;
     }
 
     async waitForDeepDebug(): Promise<void> {
-        if (this.deepDebugPromise) {
-            try {
-                await this.deepDebugPromise;
-                this.logger.info("Deep debug session completed successfully");
-            } catch (error) {
-                this.logger.error("Error during deep debug session:", error);
-            } finally {
-                // Clear promise after waiting completes
-                this.deepDebugPromise = null;
-            }
-        }
+        // No-op: deep debugging merged into main agent loop
     }
 
     protected async onProjectUpdate(message: string): Promise<void> {
@@ -1659,11 +1582,6 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
                         isStreaming: boolean,
                         tool?: { name: string; status: 'start' | 'success' | 'error'; args?: Record<string, unknown> }
                     ) => {
-                        // Track conversationId when deep_debug starts
-                        if (tool?.name === 'deep_debug' && tool.status === 'start') {
-                            this.deepDebugConversationId = conversationId;
-                        }
-                        
                         this.broadcast(WebSocketMessageResponses.CONVERSATION_RESPONSE, {
                             message,
                             conversationId,

@@ -6,7 +6,6 @@ import { toolFeedbackDefinition } from './toolkit/feedback';
 import { createQueueRequestTool } from './toolkit/queue-request';
 import { createGetLogsTool } from './toolkit/get-logs';
 import { createDeployPreviewTool } from './toolkit/deploy-preview';
-import { createDeepDebuggerTool } from "./toolkit/deep-debugger";
 import { createRenameProjectTool } from './toolkit/rename-project';
 import { createAlterBlueprintTool } from './toolkit/alter-blueprint';
 import { createReadFilesTool } from './toolkit/read-files';
@@ -14,15 +13,16 @@ import { createExecCommandsTool } from './toolkit/exec-commands';
 import { createRunAnalysisTool } from './toolkit/run-analysis';
 import { createRegenerateFileTool } from './toolkit/regenerate-file';
 import { createGenerateFilesTool } from './toolkit/generate-files';
-import { createWaitTool } from './toolkit/wait';
+// wait tool removed
 import { createGetRuntimeErrorsTool } from './toolkit/get-runtime-errors';
 import { createWaitForGenerationTool } from './toolkit/wait-for-generation';
-import { createWaitForDebugTool } from './toolkit/wait-for-debug';
 import { createGitTool } from './toolkit/git';
+import { createEditFileTool } from './toolkit/edit-file';
+import { createMultiEditFilesTool } from './toolkit/multi-edit-files';
+import { createCreateFileTool } from './toolkit/create-file';
 import { ICodingAgent } from '../services/interfaces/ICodingAgent';
 import { Message } from '../inferutils/common';
 import { ChatCompletionMessageFunctionToolCall } from 'openai/resources';
-import { DeepDebuggerSession } from '../operations/DeepDebugger';
 
 export async function executeToolWithDefinition<TArgs, TResult>(
     toolCall: ChatCompletionMessageFunctionToolCall,
@@ -36,14 +36,13 @@ export async function executeToolWithDefinition<TArgs, TResult>(
 }
 
 /**
- * Build all available tools for the agent
- * Add new tools here - they're automatically included in the conversation
+ * Build all available tools for user conversation
  */
 export function buildTools(
     agent: ICodingAgent,
     logger: StructuredLogger,
-    toolRenderer: RenderToolCall,
-    streamCb: (chunk: string) => void,
+    _toolRenderer: RenderToolCall,
+    _streamCb: (chunk: string) => void,
 ): ToolDefinition<any, any>[] {
     return [
         toolWebSearchDefinition,
@@ -52,30 +51,22 @@ export function buildTools(
         createGetLogsTool(agent, logger),
         createDeployPreviewTool(agent, logger),
         createWaitForGenerationTool(agent, logger),
-        createWaitForDebugTool(agent, logger),
         createRenameProjectTool(agent, logger),
         createAlterBlueprintTool(agent, logger),
         // Git tool (safe version - no reset for user conversations)
         createGitTool(agent, logger, { excludeCommands: ['reset'] }),
-        // Deep autonomous debugging assistant tool
-        createDeepDebuggerTool(agent, logger, toolRenderer, streamCb),
+        // Debugging tools merged into main agent
+        createReadFilesTool(agent, logger),
+        createGetRuntimeErrorsTool(agent, logger),
+        createRunAnalysisTool(agent, logger),
+        createExecCommandsTool(agent, logger),
+        createRegenerateFileTool(agent, logger),
+        createGenerateFilesTool(agent, logger),
+        // Surgical editing tools
+        createEditFileTool(agent, logger),
+        createMultiEditFilesTool(agent, logger),
+        createCreateFileTool(agent, logger),
     ];
-}
-
-export function buildDebugTools(session: DeepDebuggerSession, logger: StructuredLogger, toolRenderer?: RenderToolCall): ToolDefinition<any, any>[] {
-    const tools = [
-        createGetLogsTool(session.agent, logger),
-        createGetRuntimeErrorsTool(session.agent, logger),
-        createReadFilesTool(session.agent, logger),
-        createRunAnalysisTool(session.agent, logger),
-        createExecCommandsTool(session.agent, logger),
-        createRegenerateFileTool(session.agent, logger),
-        createGenerateFilesTool(session.agent, logger),
-        createDeployPreviewTool(session.agent, logger),
-        createWaitTool(logger),
-        createGitTool(session.agent, logger),
-    ];
-    return withRenderer(tools, toolRenderer);
 }
 
 /**

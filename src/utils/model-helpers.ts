@@ -49,20 +49,13 @@ export function categorizeAgent(agentKey: string): string {
 		'conversationalResponse': 'quickstart',
 		'blueprint': 'quickstart',
 
-		// Planning - Project planning and setup
-		'phaseGeneration': 'planning',
-		'projectSetup': 'planning',
-
 		// Coding - Development and implementation
-		'phaseImplementation': 'coding',
-		'firstPhaseImplementation': 'coding',
 		'fileRegeneration': 'coding',
+		'agenticProjectBuilder': 'coding',
 
 		// Debugging - Code fixing and review
 		'realtimeCodeFixer': 'debugging',
-		'fastCodeFixer': 'debugging',
 		'codeReview': 'debugging',
-		'deepDebugger': 'debugging',
 
 		// Advanced
 		'screenshotAnalysis': 'advanced',

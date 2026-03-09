@@ -32,6 +32,9 @@ import { createExecCommandsTool } from '../tools/toolkit/exec-commands';
 import { createWaitTool } from '../tools/toolkit/wait';
 import { createGitTool } from '../tools/toolkit/git';
 import { createGenerateImagesTool } from '../tools/toolkit/generate-images';
+import { createEditFileTool } from '../tools/toolkit/edit-file';
+import { createMultiEditFilesTool } from '../tools/toolkit/multi-edit-files';
+import { createCreateFileTool } from '../tools/toolkit/create-file';
 
 export interface AgenticProjectBuilderInputs {
     query: string;
@@ -262,6 +265,10 @@ export class AgenticProjectBuilderOperation extends AgentOperationWithTools<
             createGitTool(session.agent, logger),
             // WIP: images
             createGenerateImagesTool(session.agent, logger),
+            // Surgical editing tools
+            createEditFileTool(session.agent, logger),
+            createMultiEditFilesTool(session.agent, logger),
+            createCreateFileTool(session.agent, logger),
         ];
 
         if (!inputs.selectedTemplate || inputs.selectedTemplate === 'scratch') {

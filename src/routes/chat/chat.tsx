@@ -11,11 +11,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { LoaderCircle, MoreHorizontal, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 import { UserMessage, AIMessage } from './components/messages';
-import { PhaseTimeline } from './components/phase-timeline';
+
 import { type DebugMessage } from './components/debug-panel';
-import { DeploymentControls } from './components/deployment-controls';
+
 import { useChat } from './hooks/use-chat';
-import { type ModelConfigsInfo, type BlueprintType, type PhasicBlueprint, SUPPORTED_IMAGE_MIME_TYPES, type ProjectType, type FileType } from '@/api-types';
+import { type ModelConfigsInfo, SUPPORTED_IMAGE_MIME_TYPES, type ProjectType, type FileType } from '@/api-types';
 import { featureRegistry } from '@/features';
 import { useFileContentStream } from './hooks/use-file-content-stream';
 import { logger } from '@/utils/logger';
@@ -35,9 +35,6 @@ import { MainContentPanel } from './components/main-content-panel';
 import { ChatInput } from './components/chat-input';
 import { useVault } from '@/hooks/use-vault';
 import { VaultUnlockModal } from '@/components/vault';
-
-const isPhasicBlueprint = (blueprint?: BlueprintType | null): blueprint is PhasicBlueprint =>
-	!!blueprint && 'implementationRoadmap' in blueprint;
 
 export default function Chat() {
 	const { chatId: urlChatId } = useParams();
@@ -122,27 +119,12 @@ export default function Chat() {
 		previewUrl,
 		clearEdit,
 		projectStages,
-		phaseTimeline,
 		isThinking,
-		// Deployment and generation control
-		isDeploying,
-		cloudflareDeploymentUrl,
-		deploymentError,
-		isRedeployReady,
-		isGenerationPaused,
 		isGenerating,
-		handleStopGeneration,
-		handleResumeGeneration,
-		handleDeployToCloudflare,
 		// Preview refresh control
 		shouldRefreshPreview,
-		// Preview deployment state
-		isPreviewDeploying,
 		// Issue tracking and debugging state
-		runtimeErrorCount,
-		staticIssueCount,
 		isDebugging,
-		// Behavior type from backend
 		behaviorType,
 		projectType,
 		// Template metadata
@@ -172,7 +154,7 @@ export default function Chat() {
 
 	// Debug panel state
 	const [debugMessages, setDebugMessages] = useState<DebugMessage[]>([]);
-	const deploymentControlsRef = useRef<HTMLDivElement>(null);
+
 
 	const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 	const [isGitCloneModalOpen, setIsGitCloneModalOpen] = useState(false);
@@ -400,22 +382,15 @@ export default function Chat() {
 		allFiles,
 	]);
 
-	const isPhase1Complete = useMemo(() => {
-		return phaseTimeline.length > 0 && phaseTimeline[0].status === 'completed';
-	}, [phaseTimeline]);
-
 	const isGitHubExportReady = useMemo(() => {
-		if (behaviorType === 'agentic') {
-			return files.length > 0 && !!urlChatId;
-		}
-		return isPhase1Complete && !!urlChatId;
-	}, [behaviorType, files.length, isPhase1Complete, urlChatId]);
+		return files.length > 0 && !!urlChatId;
+	}, [files.length, urlChatId]);
 
-	// Detect if agentic mode is showing static content (docs, markdown)
+	// Detect if showing static content (docs, markdown)
 	const isStaticContent = useMemo(() => {
-		if (behaviorType !== 'agentic' || files.length === 0) return false;
+		if (files.length === 0) return false;
 		return files.every(file => isDocumentationPath(file.filePath.toLowerCase()));
-	}, [behaviorType, files]);
+	}, [files]);
 
 	// Detect content type (documentation detection - works in any projectType)
 	const contentDetection = useMemo(() => {
@@ -433,17 +408,10 @@ export default function Chat() {
 	}, [hasDocumentation, previewUrl]);
 
 	const showMainView = useMemo(() => {
-		// For agentic mode: show preview panel when files exist or preview URL exists
-		if (behaviorType === 'agentic') {
-			const hasFiles = files.length > 0;
-			const hasPreview = !!previewUrl;
-			const result = hasFiles || hasPreview;
-			return result;
-		}
-		// For phasic mode: keep existing logic
-		const result = streamedBootstrapFiles.length > 0 || !!blueprint || files.length > 0;
-		return result;
-	}, [behaviorType, blueprint, files.length, previewUrl, streamedBootstrapFiles.length]);
+		const hasFiles = files.length > 0;
+		const hasPreview = !!previewUrl;
+		return hasFiles || hasPreview;
+	}, [files.length, previewUrl]);
 
 	const [mainMessage, ...otherMessages] = useMemo(() => messages, [messages]);
 
@@ -481,25 +449,17 @@ export default function Chat() {
 			}
 			hasSeenPreview.current = true;
 		} else if (previewUrl) {
-			const isExistingChat = urlChatId !== 'new';
-			const shouldSwitch =
-				behaviorType === 'agentic' ||
-				(behaviorType === 'phasic' && isPhase1Complete) ||
-				(isExistingChat && behaviorType !== 'phasic');
-
-			if (shouldSwitch) {
-				setView('preview');
-				setShowTooltip(true);
-				setTimeout(() => {
-					setShowTooltip(false);
-				}, 3000);
-				hasSeenPreview.current = true;
-			}
+			setView('preview');
+			setShowTooltip(true);
+			setTimeout(() => {
+				setShowTooltip(false);
+			}, 3000);
+			hasSeenPreview.current = true;
 		}
 
 		// Update ref for next comparison
 		prevMarkdownCountRef.current = markdownFiles.length;
-	}, [previewUrl, isPhase1Complete, isStaticContent, files, activeFilePath, behaviorType, hasDocumentation, projectType, urlChatId]);
+	}, [previewUrl, isStaticContent, files, activeFilePath, hasDocumentation, urlChatId]);
 
 	useEffect(() => {
 		if (chatId) {
@@ -606,19 +566,6 @@ export default function Chat() {
 		[newMessage, websocket, sendUserMessage, isChatDisabled, scrollToBottom, images, clearImages],
 	);
 
-	const [progress, total] = useMemo((): [number, number] => {
-		// Calculate phase progress instead of file progress
-		const completedPhases = phaseTimeline.filter(p => p.status === 'completed').length;
-
-		// Get predicted phase count from blueprint, fallback to current phase count
-		const predictedPhaseCount = isPhasicBlueprint(blueprint)
-			? blueprint.implementationRoadmap.length
-			: 0;
-		const totalPhases = Math.max(predictedPhaseCount, phaseTimeline.length, 1);
-
-		return [completedPhases, totalPhases];
-	}, [phaseTimeline, blueprint]);
-
 	if (import.meta.env.DEV) {
 		logger.debug({
 			messages,
@@ -638,8 +585,6 @@ export default function Chat() {
 			generatingCount,
 			isBootstrapping,
 			activeFilePath,
-			progress,
-			total,
 			isRunning,
 			projectStages,
 		});
@@ -734,73 +679,6 @@ export default function Chat() {
 										isThinking={true}
 									/>
 								</div>
-							)}
-
-							{/* Only show PhaseTimeline for phasic mode */}
-							{behaviorType !== 'agentic' && (
-								<PhaseTimeline
-									projectStages={projectStages}
-									phaseTimeline={phaseTimeline}
-									files={files}
-									view={view}
-									activeFile={activeFile}
-									onFileClick={handleFileClick}
-									isThinkingNext={isThinking}
-									isPreviewDeploying={isPreviewDeploying}
-									progress={progress}
-									total={total}
-									parentScrollRef={messagesContainerRef}
-									onViewChange={(viewMode) => {
-										setView(viewMode);
-										hasSwitchedFile.current = true;
-									}}
-									chatId={chatId}
-									isDeploying={isDeploying}
-									handleDeployToCloudflare={handleDeployToCloudflare}
-									runtimeErrorCount={runtimeErrorCount}
-									staticIssueCount={staticIssueCount}
-									isDebugging={isDebugging}
-									isGenerating={isGenerating}
-									isThinking={isThinking}
-								/>
-							)}
-
-							{/* Deployment and Generation Controls - Only for phasic mode */}
-							{chatId && behaviorType !== 'agentic' && (
-								<motion.div
-									ref={deploymentControlsRef}
-									initial={{ opacity: 0, y: 20 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ duration: 0.3, delay: 0.2 }}
-									className="px-4 mb-6"
-								>
-									<DeploymentControls
-										isPhase1Complete={isPhase1Complete}
-										isDeploying={isDeploying}
-										deploymentUrl={cloudflareDeploymentUrl}
-										instanceId={chatId || ''}
-										isRedeployReady={isRedeployReady}
-										deploymentError={deploymentError}
-										appId={app?.id || chatId}
-										appVisibility={app?.visibility}
-										isGenerating={
-											isGenerating ||
-											isGeneratingBlueprint
-										}
-										isPaused={isGenerationPaused}
-										onDeploy={handleDeployToCloudflare}
-										onStopGeneration={handleStopGeneration}
-										onResumeGeneration={
-											handleResumeGeneration
-										}
-										onVisibilityUpdate={(newVisibility) => {
-											// Update app state if needed
-											if (app) {
-												app.visibility = newVisibility;
-											}
-										}}
-									/>
-								</motion.div>
 							)}
 
 							{otherMessages

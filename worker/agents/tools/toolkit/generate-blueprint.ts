@@ -11,14 +11,12 @@ export function createGenerateBlueprintTool(
 	return tool({
 		name: 'generate_blueprint',
 		description:
-			'Generate a blueprint using the backend blueprint generator. Produces a plan-based blueprint for agentic behavior and a detailed PRD for phasic. Provide a description/prompt for the project to generate a blueprint.',
+			'Generate a blueprint using the backend blueprint generator. Produces a plan-based blueprint for the project. Provide a description/prompt for the project to generate a blueprint.',
 		args: {
 			prompt: t.blueprint().describe('Prompt/user query for building the project. Use this to provide clarifications, additional requirements, or refined specifications based on conversation context.'),
 		},
 		run: async ({ prompt }) => {
 			const { env, inferenceContext, context } = agent.getOperationOptions();
-
-			const isAgentic = agent.getBehavior() === 'agentic';
 
 			const language = 'typescript';
 			const frameworks: string[] = [];
@@ -43,7 +41,6 @@ export function createGenerateBlueprintTool(
 			await agent.setBlueprint(blueprint);
 
 			logger.info('Blueprint generated via tool', {
-				behavior: isAgentic ? 'agentic' : 'phasic',
 				title: blueprint.title,
 			});
 

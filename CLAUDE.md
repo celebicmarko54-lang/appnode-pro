@@ -14,7 +14,7 @@ vibesdk is an AI-powered full-stack application generation platform built on Clo
 **Tech Stack:**
 - Frontend: React 19, TypeScript, Vite, TailwindCSS, React Router v7
 - Backend: Cloudflare Workers, Durable Objects, D1 (SQLite)
-- AI/LLM: OpenAI, Anthropic, Google AI Studio (Gemini)
+- AI/LLM: Anthropic Claude Opus 4.6 (primary), with OpenAI and Google AI Studio as potential fallbacks
 - WebSocket: PartySocket for real-time communication
 - Sandbox: Custom container service with CLI tools
 - Git: isomorphic-git with SQLite filesystem
@@ -29,11 +29,12 @@ vibesdk is an AI-powered full-stack application generation platform built on Clo
 - Route components in `src/routes/`
 
 **Backend (`/worker`):**
-- Entry point: `worker/index.ts` (7860 lines)
-- Agent system: `worker/agents/` (88 files)
-  - Core: SimpleCodeGeneratorAgent (Durable Object, 2800+ lines)
-  - Operations: PhaseGeneration, PhaseImplementation, UserConversationProcessor
-  - Tools: tools for LLM (read-files, run-analysis, regenerate-file, etc.)
+- Entry point: `worker/index.ts` (~217 lines)
+- Agent system: `worker/agents/` (~113 files)
+  - Core: SimpleCodeGeneratorAgent (Durable Object)
+  - Single behavior: AgenticCodingBehavior (no phasic behavior)
+  - Operations: AgenticProjectBuilder, UserConversationProcessor, FileRegeneration, SimpleCodeGeneration
+  - Tools: 25+ tools for LLM (read-files, run-analysis, regenerate-file, edit-file, multi-edit-files, create-file, etc.)
   - Git: isomorphic-git with SQLite filesystem
 - Database: `worker/database/` (Drizzle ORM, D1)
 - Services: `worker/services/` (sandbox, code-fixer, oauth, rate-limit, secrets)
@@ -47,7 +48,9 @@ vibesdk is an AI-powered full-stack application generation platform built on Clo
 
 **Core Architecture:**
 - Each chat session is a Durable Object instance (SimpleCodeGeneratorAgent)
-- State machine drives code generation (IDLE → PHASE_GENERATING → PHASE_IMPLEMENTING → REVIEWING)
+- Single agentic behavior — Claude Opus 4.6 runs autonomously in a tool-calling loop
+- Event-driven state via WebSocket messages (GENERATION_STARTED → FILE_GENERATING → GENERATION_COMPLETE)
+- No phasic state machine — the agent decides what to build dynamically
 - Git history stored in SQLite, full clone protocol support
 - WebSocket for real-time streaming and state synchronization
 
@@ -59,16 +62,14 @@ vibesdk is an AI-powered full-stack application generation platform built on Clo
 - Ephemeral state in memory (abort controllers, active promises)
 - Single-threaded per instance
 
-**State Machine:**
-IDLE → PHASE_GENERATING → PHASE_IMPLEMENTING → REVIEWING → IDLE
-
-**CodeGenState (Agent State):**
-- Project Identity: blueprint, projectName, templateName
+**Agent State (`AgentState`):**
+- Project Identity: blueprint (AgenticBlueprint), projectName, templateName
 - File Management: generatedFilesMap (tracks all files)
-- Phase Tracking: generatedPhases, currentPhase
-- State Machine: currentDevState, shouldBeGenerating
+- Generation Control: shouldBeGenerating, mvpGenerated, reviewingInitiated
+- Planning: currentPlan (dynamic, agent-driven)
 - Sandbox: sandboxInstanceId, commandsHistory
-- Conversation: conversationMessages, pendingUserInputs
+- Pending Inputs: pendingUserInputs, projectUpdatesAccumulator
+- No phase tracking — the agent operates in a continuous tool-calling loop
 
 **WebSocket Communication:**
 - Real-time streaming via PartySocket
@@ -84,7 +85,7 @@ IDLE → PHASE_GENERATING → PHASE_IMPLEMENTING → REVIEWING → IDLE
 ## Common Development Tasks
 
 **Change LLM Model for Operation:**
-Edit `/worker/agents/inferutils/config.ts` → `AGENT_CONFIG` object
+Edit `/worker/agents/inferutils/config.ts` → `OPUS_AGENT_CONFIG` object (all actions currently use Claude Opus 4.6 with varying `reasoning_effort` levels: low/medium/high)
 
 **Modify Conversation Agent Behavior:**
 Edit `/worker/agents/operations/UserConversationProcessor.ts` (system prompt line 50)
@@ -97,8 +98,12 @@ Edit `/worker/agents/operations/UserConversationProcessor.ts` (system prompt lin
 **Add New LLM Tool:**
 1. Create `/worker/agents/tools/toolkit/my-tool.ts`
 2. Export `createMyTool(agent, logger)` function
-3. Import in `/worker/agents/tools/customTools.ts`
-4. Add to `buildTools()` (conversation) or `buildDebugTools()` (debugger)
+3. Import and register in `/worker/agents/tools/customTools.ts` → `buildTools()` (for user conversations)
+4. Import and register in `/worker/agents/operations/AgenticProjectBuilder.ts` (for code generation)
+5. Add tool documentation to `/worker/agents/operations/prompts/agenticBuilderPrompts.ts`
+6. Update the system prompt in `/worker/agents/operations/UserConversationProcessor.ts` if the tool is for conversations
+
+**Tool Type System Constraint:** The `t.` helpers only support flat primitives (`t.string()`, `t.number()`). There is no `t.object()`. For complex parameters (arrays/objects), use `type()` with raw Zod schemas.
 
 **Add API Endpoint:**
 1. Define types in `src/api-types.ts`
@@ -109,13 +114,6 @@ Edit `/worker/agents/operations/UserConversationProcessor.ts` (system prompt lin
 6. Register in `worker/api/routes/index.ts`
 
 ## Important Context
-
-**Deep Debugger:**
-- Location: `/worker/agents/assistants/codeDebugger.ts`
-- Model: Gemini 2.5 Pro (reasoning_effort: high, 32k tokens)
-- Diagnostic priority: run_analysis → get_runtime_errors → get_logs
-- Can fix multiple files in parallel (regenerate_file)
-- Cannot run during code generation (checked via isCodeGenerating())
 
 **User Secrets Store (Durable Object):**
 - Location: `/worker/services/secrets/`
@@ -130,7 +128,7 @@ Edit `/worker/agents/operations/UserConversationProcessor.ts` (system prompt lin
 - GitVersionControl class wraps isomorphic-git
 - Key methods: commit(), reset(), log(), show()
 - FileManager auto-syncs via callback registration
-- Access control: user conversations get safe commands, debugger gets full access
+- Access control: user conversations get safe commands (git reset excluded)
 - SQLite filesystem adapter (`/worker/agents/git/fs-adapter.ts`)
 
 **Abort Controller Pattern:**
@@ -190,4 +188,5 @@ Edit `/worker/agents/operations/UserConversationProcessor.ts` (system prompt lin
 - Follow existing patterns consistently
 - Keep comments concise and purposeful
 - Write production-ready code
-- Test thoroughly before submitting
+- Run `npm run typecheck` after changes (project has 0 errors)
+- Use `npm install --legacy-peer-deps` for dependency installation

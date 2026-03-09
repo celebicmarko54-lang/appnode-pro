@@ -9,7 +9,7 @@ import { createScratchTemplateDetails } from './utils/templates';
 import { TemplateSelection } from './schemas';
 import type { ImageAttachment } from '../types/image-attachment';
 import { BaseSandboxService } from 'worker/services/sandbox/BaseSandboxService';
-import { AgentState, CurrentDevState } from './core/state';
+import { AgentState } from './core/state';
 import { CodeGeneratorAgent } from './core/codingAgent';
 import { BehaviorType, ProjectType } from './core/types';
 
@@ -56,10 +56,6 @@ export async function cloneAgent(env: Env, agentId: string) : Promise<{newAgentI
         projectUpdatesAccumulator: [],
         reviewingInitiated: false,
         mvpGenerated: false,
-        ...(originalState.behaviorType === 'phasic' ? {
-            generatedPhases: [],
-            currentDevState: CurrentDevState.IDLE,
-        } : {}),
     } as AgentState;
 
     const newAgent = await getAgentStub(env, newAgentId, {

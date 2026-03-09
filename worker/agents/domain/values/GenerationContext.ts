@@ -1,6 +1,6 @@
-import { PhasicBlueprint, AgenticBlueprint } from '../../schemas';
+import { AgenticBlueprint } from '../../schemas';
 import { FileTreeNode, TemplateDetails } from '../../../services/sandbox/sandboxTypes';
-import { FileState, PhaseState, PhasicState, AgenticState } from '../../core/state';
+import { FileState, AgentState } from '../../core/state';
 import { DependencyManagement } from '../pure/DependencyManagement';
 import type { StructuredLogger } from '../../../logger';
 import { FileProcessing } from '../pure/FileProcessing';
@@ -15,30 +15,25 @@ interface BaseGenerationContext {
     readonly commandsHistory: string[];
 }
 
-/** Phase-based generation context with detailed blueprint */
-export interface PhasicGenerationContext extends BaseGenerationContext {
-    readonly blueprint: PhasicBlueprint;
-    readonly generatedPhases: PhaseState[];
-}
-
 /** Plan-based generation context with simple blueprint */
 export interface AgenticGenerationContext extends BaseGenerationContext {
     readonly blueprint: AgenticBlueprint;
     readonly currentPlan: Plan;
 }
 
+/** @deprecated Alias for backward compatibility */
+export type PhasicGenerationContext = AgenticGenerationContext;
+
 /**
- * Discriminated union of generation contexts
- * 
- * Discriminate using: `'generatedPhases' in context` or `GenerationContext.isPhasic(context)`
+ * Generation context — always agentic
  */
-export type GenerationContext = PhasicGenerationContext | AgenticGenerationContext;
+export type GenerationContext = AgenticGenerationContext;
 
 /** Generation context utility functions */
 export const GenerationContext = {
     /** Create immutable context from agent state */
     from(
-        state: PhasicState | AgenticState,
+        state: AgentState,
         templateDetails: TemplateDetails,
         logger?: Pick<StructuredLogger, 'info' | 'warn'>
     ): GenerationContext {
@@ -53,42 +48,30 @@ export const GenerationContext = {
             state.generatedFilesMap
         );
 
-        const base = {
+        return Object.freeze({
             query: state.query,
             allFiles,
             templateDetails,
             dependencies,
             commandsHistory: state.commandsHistory || [],
-        };
-
-        return state.behaviorType === 'phasic'
-            ? Object.freeze({
-                ...base,
-                blueprint: (state as PhasicState).blueprint,
-                generatedPhases: (state as PhasicState).generatedPhases,
-            })
-            : Object.freeze({
-                ...base,
-                blueprint: (state as AgenticState).blueprint,
-                currentPlan: (state as AgenticState).currentPlan,
-            });
+            blueprint: state.blueprint,
+            currentPlan: state.currentPlan,
+        });
     },
 
-    /** Type guard for phasic context */
-    isPhasic(context: GenerationContext): context is PhasicGenerationContext {
-        return 'generatedPhases' in context;
+    /** @deprecated Always returns false — phasic removed */
+    isPhasic(_context: GenerationContext): boolean {
+        return false;
     },
 
-    /** Type guard for agentic context */
-    isAgentic(context: GenerationContext): context is AgenticGenerationContext {
-        return 'currentPlan' in context;
+    /** Type guard for agentic context — always true */
+    isAgentic(_context: GenerationContext): _context is AgenticGenerationContext {
+        return true;
     },
 
-    /** Get completed phases (empty array for agentic contexts) */
-    getCompletedPhases(context: GenerationContext): PhaseState[] {
-        return this.isPhasic(context)
-            ? context.generatedPhases.filter(phase => phase.completed)
-            : [];
+    /** @deprecated Returns empty — phases removed */
+    getCompletedPhases(_context: GenerationContext): never[] {
+        return [];
     },
 
     /** Build file tree from context files */
@@ -105,14 +88,9 @@ export const GenerationContext = {
         return builder.build();
     },
 
-    /** Get phasic blueprint if available */
-    getPhasicBlueprint(context: GenerationContext): PhasicBlueprint | undefined {
-        return this.isPhasic(context) ? context.blueprint : undefined;
-    },
-
-    /** Get agentic blueprint if available */
-    getAgenticBlueprint(context: GenerationContext): AgenticBlueprint | undefined {
-        return this.isAgentic(context) ? context.blueprint : undefined;
+    /** Get agentic blueprint */
+    getAgenticBlueprint(context: GenerationContext): AgenticBlueprint {
+        return context.blueprint;
     },
 
     /** Get common blueprint data */

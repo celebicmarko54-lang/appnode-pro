@@ -192,8 +192,27 @@ ${isPresentationProject ? '[Note: For presentations, deploy_preview updates the 
 - What: Generate complete file contents, can batch multiple files sequentially, can be called multiple times in parallel
 - How: Files → Virtual FS, auto-committed to git
 - When: Creating NEW files that don't exist, or file needs complete rewrite (80%+ changes)
-- When NOT: Modifying existing files - use regenerate_file instead (more efficient)
+- When NOT: Modifying existing files - use edit_file or regenerate_file instead (more efficient)
 - After-effect: Must call deploy_preview to sync to sandbox before testing
+
+**edit_file** - Surgical precise edits to existing files
+- What: Replace exact string matches in a file with new content
+- How: Each edit must match exactly ONE location (uniqueness safety check)
+- When: Small to medium changes (< 80% of file). Preferred over regenerate_file for targeted edits.
+- Safety: Fails if oldString matches 0 or multiple locations. Include 3+ lines of context.
+- After-effect: Changes are deployed to sandbox automatically
+
+**multi_edit_files** - Batch edits across multiple files
+- What: Apply multiple search-replace edits across different files in one call
+- How: Same uniqueness check as edit_file, grouped by file
+- When: Coordinated changes across 2+ files (e.g., rename, cross-file refactor)
+- After-effect: All changed files deployed to sandbox automatically
+
+**create_file** - Create a new file with specified content
+- What: Create a single file with exact content you provide
+- How: File → Virtual FS → deployed to sandbox
+- When: You know the exact content for a new file (no LLM generation needed)
+- When NOT: Complex multi-file generation (use generate_files instead)
 
 **regenerate_file** - Surgical or extensive modifications to existing files
 - What: Modify existing files (small tweaks or major changes), up to 3 passes, returns diff

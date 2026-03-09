@@ -9,7 +9,7 @@ export function createWaitForGenerationTool(
 	return tool({
 		name: 'wait_for_generation',
 		description:
-			'Wait for code generation to complete. Use when deep_debug returns GENERATION_IN_PROGRESS error. Returns immediately if no generation is running.',
+			'Wait for code generation to complete. Use when you need to wait for the AI agent to finish active code generation. Returns immediately if no generation is running.',
 		args: {},
 		run: async () => {
 			try {

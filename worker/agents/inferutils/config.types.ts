@@ -166,6 +166,16 @@ const MODELS_MASTER = {
             contextSize: 200000, // 200K Context
         }
     },
+    CLAUDE_OPUS_4_6: {
+        id: 'anthropic/claude-opus-4-6',
+        config: {
+            name: 'Claude Opus 4.6',
+            size: ModelSize.LARGE,
+            provider: 'anthropic',
+            creditCost: 30, // $7.50
+            contextSize: 200000, // 200K Context
+        }
+    },
 
     // --- OpenAI Models ---
     OPENAI_5: {
@@ -397,15 +407,10 @@ export interface AgentConfig {
     templateSelection: ModelConfig;
     blueprint: ModelConfig;
     projectSetup: ModelConfig;
-    phaseGeneration: ModelConfig;
-    phaseImplementation: ModelConfig;
-    firstPhaseImplementation: ModelConfig;
     fileRegeneration: ModelConfig;
     screenshotAnalysis: ModelConfig;
     realtimeCodeFixer: ModelConfig;
-    fastCodeFixer: ModelConfig;
     conversationalResponse: ModelConfig;
-    deepDebugger: ModelConfig;
     agenticProjectBuilder: ModelConfig;
 }
 
