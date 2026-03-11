@@ -60,24 +60,24 @@ export interface RateLimitSettings {
 
 export const DEFAULT_RATE_LIMIT_SETTINGS: RateLimitSettings = {
 	apiRateLimit: {
-		enabled: true,
+		enabled: false,
 		store: RateLimitStore.RATE_LIMITER,
 		bindingName: 'API_RATE_LIMITER',
 	},
 	authRateLimit: {
-		enabled: true,
+		enabled: false,
 		store: RateLimitStore.RATE_LIMITER,
 		bindingName: 'AUTH_RATE_LIMITER',
 	},
 	appCreation: {
-		enabled: true,
+		enabled: false,
 		store: RateLimitStore.DURABLE_OBJECT,
 		limit: 10,
         dailyLimit: 10,
 		period: 4 * 60 * 60, // 4 hour
 	},
 	llmCalls: {
-		enabled: true,
+		enabled: false,
 		store: RateLimitStore.DURABLE_OBJECT,
 		limit: 500,
 		period: 2 * 60 * 60, // 2 hour
