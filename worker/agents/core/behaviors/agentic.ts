@@ -231,9 +231,16 @@ export class AgenticCodingBehavior extends BaseCodingBehavior<AgentState> implem
         };
     }
     
+    private static readonly MAX_BUILD_ATTEMPTS = 5;
+
     async build(): Promise<void> {
         let attempt = 0;
         while (!this.isMVPGenerated() || this.state.pendingUserInputs.length > 0) {
+            if (attempt >= AgenticCodingBehavior.MAX_BUILD_ATTEMPTS) {
+                this.logger.warn('Max build attempts reached, marking generation complete');
+                this.setMVPGenerated();
+                break;
+            }
             await this.executeGeneration(attempt);
             attempt++;
         }
@@ -293,7 +300,7 @@ export class AgenticCodingBehavior extends BaseCodingBehavior<AgentState> implem
                         conversationId: aiConversationId,
                         isStreaming: false
                     });
-                } else if (!pendingUserInputs) {
+                } else if (pendingUserInputs.length === 0) {
                     // MVP hasnt been generated but it's not the first attempt - indicates maybe the agent forgot to mark completion
                     conversationHistory = [...conversationHistory, {
                         role: 'user',
@@ -375,7 +382,6 @@ export class AgenticCodingBehavior extends BaseCodingBehavior<AgentState> implem
             });
             throw error;
         } finally {
-            this.generationPromise = null;
             this.clearAbortController();
         }
     }
